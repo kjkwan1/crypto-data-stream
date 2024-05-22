@@ -4,8 +4,4 @@ import { apiStreamRunnable } from "./src/program/api-stream";
 
 dotenv.config();
 
-const main = () => Effect.gen(function* () {
-   const apiStream = yield* Effect.fork(apiStreamRunnable);
-});
-
-Effect.runPromise(main());
+Effect.runPromise(apiStreamRunnable).then(console.log);

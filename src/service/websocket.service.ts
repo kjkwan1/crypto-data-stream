@@ -1,28 +1,32 @@
-import * as Q from "effect/Queue";
-import * as E from "effect/Effect";
 import * as L from "effect/Layer";
-import { Context } from "effect";
+import { Context, Effect, Queue } from "effect";
+import { UnifiedData } from "../interface/unified-data.interface";
 
 export class WebsocketService extends Context.Tag('WebsocketService')<
     WebsocketService,
     {
-        readonly createStream: (
+        readonly createAuthenticatedStream: (
             url: string,
             payload: string,
-            queue: Q.Queue<string>,
-        ) => E.Effect<void, never, never>;
+            queue: Queue.Queue<string>,
+        ) => Effect.Effect<void>;
+        readonly createStream: <T>(
+            url: string,
+            toUnifiedData: (data: T) => UnifiedData,
+            queue: Queue.Queue<UnifiedData>,
+        ) => Effect.Effect<void>;
     }
 >() {}
 
 export const WebsocketServiceLive = L.succeed(
     WebsocketService,
     WebsocketService.of({
-        createStream: (
+        createAuthenticatedStream: (
             url: string,
             payload: string,
-            queue: Q.Queue<string>,
-        ) => E.scoped(
-            E.gen(function* () {
+            queue: Queue.Queue<string>,
+        ) => Effect.scoped(
+            Effect.gen(function* () {
                 const ws = new WebSocket(url);
 
                 ws.onopen = () => {
@@ -30,14 +34,28 @@ export const WebsocketServiceLive = L.succeed(
                 }
 
                 ws.onmessage = (event) => {
-                    E.runPromise(Q.offer(queue, event.data.toString()));
+                    Effect.runPromise(Queue.offer(queue, event.data.toString()));
                 }
 
                 ws.onerror = (event) => {
                     console.log('errored on websocket', event);
                 };
                 
-                yield* E.never;
+                yield* Effect.never;
+            })
+        ),
+        createStream: <T>(url: string, toUnifiedData: (data: T) => UnifiedData, queue: Queue.Queue<UnifiedData>) => Effect.scoped(
+            Effect.gen(function* () {
+                const ws = new WebSocket(url);
+                ws.onmessage = (event) => {
+                    Effect.runPromise(Queue.offer(queue, toUnifiedData(event.data)));
+                }
+
+                ws.onerror = (event) => {
+                    console.log('errored on websocket', event);
+                };
+
+                yield* Effect.never;
             })
         )
     })

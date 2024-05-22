@@ -3,7 +3,7 @@ import { Context, Effect, Layer } from "effect";
 export class ApiService extends Context.Tag('ApiService')<
     ApiService,
     {
-        readonly get: <T>(url: string, headers: any) => Effect.Effect<T, Error>;
+        readonly get: <T>(url: string, headers?: any) => Effect.Effect<T, Error>;
     }
 >() {}
 

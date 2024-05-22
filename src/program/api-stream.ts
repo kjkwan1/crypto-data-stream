@@ -1,8 +1,9 @@
-import { Effect, Fiber, Layer, Queue } from "effect";
+import { Console, Effect, Fiber, Layer, PubSub, Queue, Stream } from "effect";
 import { ApiService, ApiServiceLive } from "../service/api.service";
 import { StreamService, StreamServiceLive } from "../service/stream.service";
 import { BlockchainData, BlockchainResponse } from "../interface/blockchain.interface";
 import { blockchainRef } from "../state/blockchain.ref";
+import { blockchainUiFiber } from "./ui-fiber";
 
 const apiStream = (): Effect.Effect<void, Error, StreamService | ApiService> => 
     Effect.scoped(
@@ -16,24 +17,28 @@ const apiStream = (): Effect.Effect<void, Error, StreamService | ApiService> =>
                 'X-API-Token': process.env.BLOCKCHAIN_SECRET,
             };
             const blockchainData = apiService.get<BlockchainResponse>(url, headers);
-            const blockchainQueue = yield* Queue.bounded<BlockchainData>(100);
+            const blockchainQueue = yield* Queue.bounded<BlockchainData>(200);
 
             const apiStreamFiber: Fiber.RuntimeFiber<void, Error> = yield* Effect.fork(
                 streamService.generateApiStream<BlockchainResponse, BlockchainData>(
                     blockchainData,
                     blockchainQueue,
-                    5000
+                    2000
                 )
             );
+
             const streamQueueToRefFiber: Fiber.RuntimeFiber<void, Error> = yield* Effect.fork(
-                streamService.streamQueueToRef(
+                streamService.streamQueueToRef<BlockchainData>(
                     blockchainQueue,
                     blockchainRef,
-                    'id',
+                    'base_currency',
+                    'auction_price',
                 )
             );
-        
-            yield* Fiber.joinAll([apiStreamFiber, streamQueueToRefFiber]);
+
+            const uiFiber1: Fiber.RuntimeFiber<void, Error> = yield* Effect.fork(blockchainUiFiber(blockchainRef));
+
+            yield* Fiber.joinAll([apiStreamFiber, streamQueueToRefFiber, uiFiber1]);
         })
     )
 

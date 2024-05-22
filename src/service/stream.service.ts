@@ -1,4 +1,5 @@
-import { Chunk, Console, Context, Effect, Layer, Queue, Schedule, Stream, SynchronizedRef, pipe } from "effect";
+import { Chunk, Console, Context, Effect, Layer, Queue, Ref, Schedule, Stream, SynchronizedRef, pipe } from "effect";
+import { hasChanges } from "../state/blockchain.ref";
 
 export class StreamService extends Context.Tag('StreamService')<
     StreamService,
@@ -11,8 +12,9 @@ export class StreamService extends Context.Tag('StreamService')<
         readonly streamQueueToRef: <T>(
             queue: Queue.Queue<T>,
             state: SynchronizedRef.SynchronizedRef<Record<string, T>>,
-            key: string,
-        ) => Effect.Effect<void, Error, never>,
+            key: keyof T,
+            compareValue: keyof T,
+        ) => Effect.Effect<void, Error, never>
     }
 >() {}
 
@@ -26,7 +28,6 @@ export const StreamServiceLive = Layer.succeed(
         ) => pipe(
             Stream.repeatEffect(runnable),
             Stream.schedule(Schedule.fixed(interval)),
-            Stream.tap(Console.log),
             Stream.mapConcat((response: T) => Chunk.fromIterable(Object.values(response as Record<string, A>))),
             Stream.mapEffect((chunk) => Queue.offer(queue, chunk)),
             Stream.runDrain,
@@ -34,18 +35,30 @@ export const StreamServiceLive = Layer.succeed(
         streamQueueToRef: <T>(
             queue: Queue.Queue<T>,
             state: SynchronizedRef.SynchronizedRef<Record<string, T>>,
-            key: string,
+            key: keyof T,
+            compareKey: keyof T,
         ) => pipe(
             Stream.fromQueue(queue),
             Stream.tap((item) => Console.log('streamQueueToRef: ', item)),
-            Stream.mapEffect((data: any) => SynchronizedRef.update(state, prev => {
+            Stream.mapEffect((data: T) => SynchronizedRef.update(state, prev => {
+                const id = data[key] as string;
+                const prevVal = prev[id];
                 const newState = {...prev};
-                if (data[key]) {
-                    newState[key] = data;
+
+                if (!prevVal) {
+                    newState[id] = data;
+                    return newState;
                 }
+
+                if (data[compareKey] === prevVal[compareKey]) {
+                    return prev;
+                }
+                
+                console.log(`Data for ${data[key]} changed: `, data);
+                newState[id] = data;
                 return newState;
             })),
             Stream.runDrain,
-        )
+        ),
     })
 )
