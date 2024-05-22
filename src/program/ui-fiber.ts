@@ -1,4 +1,4 @@
-import { Console, Stream, SubscriptionRef, pipe } from "effect";
+import { Console, Effect, Stream, SubscriptionRef, pipe } from "effect";
 import { BlockchainData } from "../interface/blockchain.interface";
 
 export const blockchainUiFiber = (ref: SubscriptionRef.SubscriptionRef<Record<string, BlockchainData>>) => pipe(
@@ -8,3 +8,7 @@ export const blockchainUiFiber = (ref: SubscriptionRef.SubscriptionRef<Record<st
     }),
     Stream.runDrain,
 )
+
+// const createOrUpdate: Effect.Effect<void, Error> = (chunk: Record<string, BlockchainData>) => pipe(
+//     Stream.filter()
+// )

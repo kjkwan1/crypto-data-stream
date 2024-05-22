@@ -1,4 +1,4 @@
-import { Console, Effect, Fiber, Layer, PubSub, Queue, Stream } from "effect";
+import { Effect, Fiber, Layer, Queue } from "effect";
 import { ApiService, ApiServiceLive } from "../service/api.service";
 import { StreamService, StreamServiceLive } from "../service/stream.service";
 import { BlockchainData, BlockchainResponse } from "../interface/blockchain.interface";
@@ -22,23 +22,17 @@ const apiStream = (): Effect.Effect<void, Error, StreamService | ApiService> =>
             const apiStreamFiber: Fiber.RuntimeFiber<void, Error> = yield* Effect.fork(
                 streamService.generateApiStream<BlockchainResponse, BlockchainData>(
                     blockchainData,
-                    blockchainQueue,
-                    2000
-                )
-            );
-
-            const streamQueueToRefFiber: Fiber.RuntimeFiber<void, Error> = yield* Effect.fork(
-                streamService.streamQueueToRef<BlockchainData>(
-                    blockchainQueue,
                     blockchainRef,
+                    blockchainQueue,
                     'base_currency',
                     'auction_price',
+                    3000
                 )
             );
 
-            const uiFiber1: Fiber.RuntimeFiber<void, Error> = yield* Effect.fork(blockchainUiFiber(blockchainRef));
+            const uiFiber: Fiber.RuntimeFiber<void, Error> = yield* Effect.fork(blockchainUiFiber(blockchainRef));
+            yield* Fiber.joinAll<void, Error>([apiStreamFiber, uiFiber]);
 
-            yield* Fiber.joinAll([apiStreamFiber, streamQueueToRefFiber, uiFiber1]);
         })
     )
 
